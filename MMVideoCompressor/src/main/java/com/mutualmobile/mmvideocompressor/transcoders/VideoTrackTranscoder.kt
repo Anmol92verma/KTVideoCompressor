@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaCodec.CONFIGURE_FLAG_ENCODE
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import com.mutualmobile.mmvideocompressor.compat.MediaCodecBufferCompatWrapper
 import com.mutualmobile.mmvideocompressor.muxer.QueuedMuxer
 import com.mutualmobile.mmvideocompressor.muxer.SampleInfo.SampleType
 import com.mutualmobile.mmvideocompressor.muxer.SampleInfo.SampleType.VIDEO
@@ -21,9 +20,6 @@ class VideoTrackTranscoder(
 
   private lateinit var mEncoder: MediaCodec
   private lateinit var mDecoder: MediaCodec
-
-  private var decoderBuffers: MediaCodecBufferCompatWrapper? = null
-  private var encoderBuffers: MediaCodecBufferCompatWrapper? = null
 
   private var mActualOutputFormat: MediaFormat? = null
   private var mDecoderOutputSurfaceWrapper: OutputSurface? = null
@@ -59,7 +55,6 @@ class VideoTrackTranscoder(
     // create a inputsurface to grab video frames
     val mEncoder = MediaCodec.createEncoderByType(videoOutputFormat.getString(MediaFormat.KEY_MIME)!!)
     mEncoder.configure(videoOutputFormat, null, null, CONFIGURE_FLAG_ENCODE)
-    encoderBuffers = MediaCodecBufferCompatWrapper(mEncoder)
     mEncoderInputSurfaceWrapper = InputSurface(mEncoder.createInputSurface())
     mEncoderInputSurfaceWrapper?.makeCurrent()
 
@@ -74,7 +69,6 @@ class VideoTrackTranscoder(
     mDecoder.configure(inputFormat, mDecoderOutputSurfaceWrapper?.surface, null, 0)
     mDecoder.start()
     mDecoderStarted = true
-    decoderBuffers = MediaCodecBufferCompatWrapper(mDecoder)
     return mDecoder
   }
 
@@ -133,7 +127,7 @@ class VideoTrackTranscoder(
         mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         return DRAIN_STATE_NONE
       }
-      decoderBuffers?.getInputBuffer(index)
+      mDecoder.getInputBuffer(index)
         ?.let { byteBufferAtIndex ->
           val sampleSize = mediaExtractor.readSampleData(byteBufferAtIndex, 0)
           val presentationTime: Long = mediaExtractor.sampleTime
@@ -163,7 +157,7 @@ class VideoTrackTranscoder(
     val result = mDecoder.dequeueOutputBuffer(mBufferInfo, timeoutUs)
     when (result) {
       MediaCodec.INFO_TRY_AGAIN_LATER -> return DRAIN_STATE_NONE
-      MediaCodec.INFO_OUTPUT_FORMAT_CHANGED, MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
+      MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
     }
     if (mBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
       mEncoder.signalEndOfInputStream()
@@ -215,14 +209,14 @@ class VideoTrackTranscoder(
       result.let { mEncoder.releaseOutputBuffer(it, false) }
       return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
     }
-    result.let {
-      encoderBuffers?.getOutputBuffer(it)
-        ?.let {
-          queuedMuxer.writeSampleData(SampleType.VIDEO, it, mBufferInfo)
-        }
-    }
+
+    mEncoder.getOutputBuffer(result)
+      ?.let {
+        queuedMuxer.writeSampleData(SampleType.VIDEO, it, mBufferInfo)
+      }
+
     mWrittenPresentationTimeUs = mBufferInfo.presentationTimeUs
-    result.let { mEncoder.releaseOutputBuffer(it, false) }
+    mEncoder.releaseOutputBuffer(result, false)
     return DRAIN_STATE_CONSUMED
   }
 

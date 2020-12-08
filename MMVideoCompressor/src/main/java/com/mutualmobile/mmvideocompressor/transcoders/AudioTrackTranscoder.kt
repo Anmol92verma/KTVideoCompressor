@@ -3,10 +3,8 @@ package com.mutualmobile.mmvideocompressor.transcoders
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import com.mutualmobile.mmvideocompressor.compat.MediaCodecBufferCompatWrapper
 import com.mutualmobile.mmvideocompressor.engine.AudioChannel
 import com.mutualmobile.mmvideocompressor.muxer.QueuedMuxer
-import com.mutualmobile.mmvideocompressor.muxer.SampleInfo
 import com.mutualmobile.mmvideocompressor.muxer.SampleInfo.SampleType.AUDIO
 import timber.log.Timber
 
@@ -17,17 +15,19 @@ class AudioTrackTranscoder(
   private val queuedMuxer: QueuedMuxer
 ) : TrackTranscoder {
 
+  companion object{
+    private const val DRAIN_STATE_NONE = 0
+    private const val DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY = 1
+    private const val DRAIN_STATE_CONSUMED = 2
+  }
+
   private lateinit var encoder: MediaCodec
   private lateinit var mDecoder: MediaCodec
   private var mInputFormat: MediaFormat? = null
   private var mActualOutputFormat: MediaFormat? = null
-  private val DRAIN_STATE_NONE = 0
-  private val DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY = 1
-  private val DRAIN_STATE_CONSUMED = 2
+
 
   private var audioChannel: AudioChannel? = null
-  private var decoderBuffers: MediaCodecBufferCompatWrapper? = null
-  private var encoderBuffers: MediaCodecBufferCompatWrapper? = null
 
   private var encoderStarted: Boolean = false
   private var decoderStarted: Boolean = false
@@ -58,7 +58,6 @@ class AudioTrackTranscoder(
     decoder.configure(inputFormat, null, null, 0)
     decoder.start()
     decoderStarted = true
-    decoderBuffers = MediaCodecBufferCompatWrapper(decoder)
     return decoder
   }
 
@@ -67,7 +66,6 @@ class AudioTrackTranscoder(
     encoder.configure(audioOutputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
     encoder.start()
     encoderStarted = true
-    encoderBuffers = MediaCodecBufferCompatWrapper(encoder)
     return encoder
   }
 
@@ -104,7 +102,7 @@ class AudioTrackTranscoder(
       return DRAIN_STATE_NONE
     }
 
-    decoderBuffers?.getInputBuffer(indexInputBuffer)
+    mDecoder.getInputBuffer(indexInputBuffer)
       ?.let { byteBufferAtIndex ->
         val sampleSize = mediaExtractor.readSampleData(byteBufferAtIndex, 0)
         Timber.e("read sample data $sampleSize")
@@ -134,7 +132,6 @@ class AudioTrackTranscoder(
         audioChannel?.setActualDecodedFormat(mDecoder.outputFormat)
         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
       }
-      MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> TODO()
     }
 
     when {
@@ -169,9 +166,6 @@ class AudioTrackTranscoder(
         mActualOutputFormat?.let { queuedMuxer.setOutputFormat(AUDIO, it) }
         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
       }
-      MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> {
-        TODO()
-      }
     }
 
     if (mActualOutputFormat == null) {
@@ -188,17 +182,16 @@ class AudioTrackTranscoder(
       result.let { encoder.releaseOutputBuffer(it, false) }
       return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
     }
-    result.let {
-      encoderBuffers?.getOutputBuffer(it)
-        ?.let {
-          queuedMuxer.writeSampleData(
-            SampleInfo.SampleType.AUDIO, it,
-            mBufferInfo
-          )
-        }
+
+    val outBuffer = encoder.getOutputBuffer(result)
+    outBuffer?.let {
+      queuedMuxer.writeSampleData(
+        AUDIO, it,
+        mBufferInfo
+      )
     }
     mWrittenPresentationTimeUs = mBufferInfo.presentationTimeUs
-    result.let { encoder.releaseOutputBuffer(it, false) }
+    encoder.releaseOutputBuffer(result, false)
     return DRAIN_STATE_CONSUMED
   }
 

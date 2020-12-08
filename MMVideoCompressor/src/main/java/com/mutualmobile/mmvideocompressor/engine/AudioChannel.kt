@@ -2,7 +2,6 @@ package com.mutualmobile.mmvideocompressor.engine
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import com.mutualmobile.mmvideocompressor.compat.MediaCodecBufferCompatWrapper
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
@@ -30,19 +29,14 @@ internal class AudioChannel(
 
   private var mRemixer: AudioRemixer? = null
 
-  private val mDecoderBuffers: MediaCodecBufferCompatWrapper =
-    MediaCodecBufferCompatWrapper(mDecoder)
-  private val mEncoderBuffers: MediaCodecBufferCompatWrapper =
-    MediaCodecBufferCompatWrapper(mEncoder)
-
   private val mOverflowBuffer = AudioBuffer()
 
   private var mActualDecodedFormat: MediaFormat? = null
 
   private class AudioBuffer {
-    internal var bufferIndex: Int = 0
-    internal var presentationTimeUs: Long = 0
-    internal var data: ShortBuffer? = null
+    var bufferIndex: Int = 0
+    var presentationTimeUs: Long = 0
+    var data: ShortBuffer? = null
   }
 
   fun setActualDecodedFormat(decodedFormat: MediaFormat) {
@@ -90,7 +84,7 @@ internal class AudioChannel(
     val data = if (bufferIndex == BUFFER_INDEX_END_OF_STREAM)
       null
     else
-      mDecoderBuffers.getOutputBuffer(bufferIndex)
+      mDecoder.getOutputBuffer(bufferIndex)
 
     var buffer: AudioBuffer? = mEmptyBuffers.poll()
     if (buffer == null) {
@@ -127,7 +121,7 @@ internal class AudioChannel(
     }
 
     // Drain overflow first
-    val outBuffer = mEncoderBuffers.getInputBuffer(encoderInBuffIndex)
+    val outBuffer = mEncoder.getInputBuffer(encoderInBuffIndex)
       ?.asShortBuffer()
     outBuffer?.let {
       if (hasOverflow) {
