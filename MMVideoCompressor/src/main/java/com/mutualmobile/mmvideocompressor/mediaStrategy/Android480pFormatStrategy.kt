@@ -4,6 +4,7 @@ import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaFormat
 import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_AUDIO_AAC
+import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_VIDEO_AVC
 import timber.log.Timber
 
 class Android480pFormatStrategy(
@@ -39,12 +40,13 @@ class Android480pFormatStrategy(
       Timber.e("This video is less or equal to 720p, pass-through. (  $width  x $height  )")
       return null
     }
-    val format = MediaFormat.createVideoFormat("video/avc", outWidth, outHeight)
-    // From Nexus 4 Camera in 720p
+
+    val format = MediaFormat.createVideoFormat(MIMETYPE_VIDEO_AVC, outWidth, outHeight)
     format.setInteger(MediaFormat.KEY_BIT_RATE, mVideoBitrate)
-    format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)
+    format.setInteger(MediaFormat.KEY_FRAME_RATE, 24)
     format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3)
     format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatSurface)
+
     return format
   }
 
