@@ -1,0 +1,18 @@
+<paths>
+
+  <external-cache-path
+      name="external_cache_path"
+      path="." />
+
+  <external-files-path
+      name="external_files_path"
+      path="." />
+
+  <external-path
+      name="external_path"
+      path="." />
+
+  <external-path
+      name="external_video_files"
+      path="Movies/" />
+</paths>

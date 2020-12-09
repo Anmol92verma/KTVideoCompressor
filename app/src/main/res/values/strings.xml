@@ -1,3 +1,9 @@
 <resources>
   <string name="app_name">MMVideoCompressorSample</string>
+  <string name="transcode_now">Transcode Now</string>
+  <string name="stop_trans">Stop Transcode</string>
+  <string name="video_bitrate">Video Bitrate</string>
+  <string name="video_height">Video Height</string>
+  <string name="video_width">Video Width</string>
+  <string name="pick_video">Pick Video</string>
 </resources>

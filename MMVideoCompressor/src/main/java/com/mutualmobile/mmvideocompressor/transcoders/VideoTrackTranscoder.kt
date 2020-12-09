@@ -2,6 +2,7 @@ package com.mutualmobile.mmvideocompressor.transcoders
 
 import android.media.MediaCodec
 import android.media.MediaCodec.CONFIGURE_FLAG_ENCODE
+import android.media.MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import com.mutualmobile.mmvideocompressor.muxer.QueuedMuxer
@@ -10,6 +11,7 @@ import com.mutualmobile.mmvideocompressor.muxer.SampleInfo.SampleType.VIDEO
 import com.mutualmobile.mmvideocompressor.utils.KEY_ROTATION_DEGREES
 import com.mutualmobile.mmvideocompressor.videosurface.InputSurface
 import com.mutualmobile.mmvideocompressor.videosurface.OutputSurface
+import timber.log.Timber
 
 class VideoTrackTranscoder(
   private val mediaExtractor: MediaExtractor,
@@ -158,6 +160,10 @@ class VideoTrackTranscoder(
     when (result) {
       MediaCodec.INFO_TRY_AGAIN_LATER -> return DRAIN_STATE_NONE
       MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
+      INFO_OUTPUT_BUFFERS_CHANGED -> {
+        Timber.e("INFO_OUTPUT_BUFFERS_CHANGED")
+        return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
+      }
     }
     if (mBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
       mEncoder.signalEndOfInputStream()
@@ -193,7 +199,7 @@ class VideoTrackTranscoder(
         return DRAIN_STATE_SHOULD_RETRY_IMMEDIATELY
       }
       MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> {
-        TODO()
+        Timber.e("INFO_OUTPUT_BUFFERS_CHANGED")
       }
     }
     if (mActualOutputFormat == null) {
