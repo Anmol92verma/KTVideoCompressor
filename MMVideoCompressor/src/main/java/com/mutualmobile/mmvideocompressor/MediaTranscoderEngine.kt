@@ -53,33 +53,28 @@ class MediaTranscoderEngine {
     progressChannel: MutableStateFlow<Double>?,
     outPath: String,
     mediaFileDescriptor: FileDescriptor,
-  ): Boolean {
+  ) {
     return withContext(coroutineContext) {
-      try {
-        val mediaExtractor = MediaExtractor()
-        mediaExtractor.setDataSource(mediaFileDescriptor)
+      val mediaExtractor = MediaExtractor()
+      mediaExtractor.setDataSource(mediaFileDescriptor)
 
-        val mediaMuxer = MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val duration = extractVideoDuration(mediaFileDescriptor, mediaMuxer)
+      val mediaMuxer = MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+      val duration = extractVideoDuration(mediaFileDescriptor, mediaMuxer)
 
-        val transcoders = setupTrackTranscoders(outFormatStrategy, mediaExtractor, mediaMuxer)
+      val transcoders = setupTrackTranscoders(outFormatStrategy, mediaExtractor, mediaMuxer)
 
-        runPipelines(
-          duration, transcoders.first, transcoders.second, coroutineContext,
-          progressChannel
-        )
+      runPipelines(
+        duration, transcoders.first, transcoders.second, coroutineContext,
+        progressChannel
+      )
 
-        mediaMuxer.stop()
+      mediaMuxer.stop()
 
-        transcoders.first?.release()
-        transcoders.second?.release()
+      transcoders.first?.release()
+      transcoders.second?.release()
 
-        mediaExtractor.release()
-        mediaMuxer.release()
-      } catch (ex: Exception) {
-        ex.printStackTrace()
-      }
-      true
+      mediaExtractor.release()
+      mediaMuxer.release()
     }
   }
 

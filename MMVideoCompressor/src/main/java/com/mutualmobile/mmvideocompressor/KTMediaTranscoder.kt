@@ -5,6 +5,7 @@ import com.mutualmobile.mmvideocompressor.mediaStrategy.MediaFormatStrategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.FileInputStream
 
 class KTMediaTranscoder {
@@ -17,22 +18,28 @@ class KTMediaTranscoder {
     outPath: String,
     outFormatStrategy: MediaFormatStrategy,
     progressChannel: MutableStateFlow<Double>?
-  ): Boolean {
+  ) {
     return withContext(Dispatchers.IO) {
       currentTranscodingPath = inPath
       currentTranscodingOutPath = outPath
       val fileInputStream = FileInputStream(inPath)
       val inFileDescriptor = fileInputStream.fd
-      val engine = MediaTranscoderEngine()
-      engine.transcodeVideo(
-        outFormatStrategy = outFormatStrategy,
-        coroutineContext = coroutineContext,
-        progressChannel = progressChannel,
-        outPath = outPath,
-        mediaFileDescriptor = inFileDescriptor
-      )
-      fileInputStream.close()
-      true
+      try {
+        val engine = MediaTranscoderEngine()
+        engine.transcodeVideo(
+          outFormatStrategy = outFormatStrategy,
+          coroutineContext = coroutineContext,
+          progressChannel = progressChannel,
+          outPath = outPath,
+          mediaFileDescriptor = inFileDescriptor
+        )
+        fileInputStream.close()
+      } catch (ex: Exception) {
+        Timber.e(ex)
+      } finally {
+        fileInputStream.close()
+      }
+
     }
   }
 

@@ -1,6 +1,7 @@
 package com.mutualmobile.mmvideocompressor.muxer
 
 import android.media.MediaCodec
+import android.media.MediaCodec.BufferInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import com.mutualmobile.mmvideocompressor.muxer.SampleInfo.SampleType
@@ -24,39 +25,27 @@ class QueuedMuxer(private val mediaMuxer: MediaMuxer) {
     sampleType: SampleType,
     mediaFormat: MediaFormat
   ) {
-    when (sampleType) {
-      VIDEO -> mVideoFormat = mediaFormat
-      AUDIO -> mAudioFormat = mediaFormat
-    }
+    addAVTracksToMuxer(sampleType, mediaFormat)
 
-    when (sampleType) {
-      AUDIO -> {
-        mAudioTrackIndex = mediaMuxer.addTrack(mediaFormat)
-        Timber.e(
-          "Added track #$mAudioTrackIndex with ${mAudioFormat?.getString(
-            MediaFormat.KEY_MIME
-          )} to muxer"
-        )
-      }
-      VIDEO -> {
-        mVideoTrackIndex = mediaMuxer.addTrack(mediaFormat)
-        Timber.e(
-          "Added track #$mVideoTrackIndex with ${mVideoFormat?.getString(
-            MediaFormat.KEY_MIME
-          )} to muxer"
-        )
-      }
-    }
     if (mAudioTrackIndex == null || mVideoTrackIndex == null) return
+
     mediaMuxer.start()
     muxerStarted = true
 
-    if (mByteBuffer == null) {
-      mByteBuffer = ByteBuffer.allocate(0)
-    }
-    mByteBuffer?.flip()
+    initBuffer()
 
-    val bufferInfo = MediaCodec.BufferInfo()
+    tryWritingSampleData()
+
+    clearSampleDataFromBuffer()
+  }
+
+  private fun clearSampleDataFromBuffer() {
+    mSampleInfoList.clear()
+    mByteBuffer?.clear()
+  }
+
+  private fun tryWritingSampleData() {
+    val bufferInfo = BufferInfo()
     var offset = 0
     mSampleInfoList.forEach {
       it.writeToBufferInfo(bufferInfo, offset = offset)
@@ -67,9 +56,43 @@ class QueuedMuxer(private val mediaMuxer: MediaMuxer) {
       }
       offset += it.size
     }
+  }
 
-    mSampleInfoList.clear()
-    mByteBuffer?.clear()
+  private fun initBuffer() {
+    if (mByteBuffer == null) {
+      mByteBuffer = ByteBuffer.allocate(0)
+    }
+    mByteBuffer?.flip()
+  }
+
+  private fun addAVTracksToMuxer(
+    sampleType: SampleType,
+    mediaFormat: MediaFormat
+  ) {
+    when (sampleType) {
+      VIDEO -> {
+        mVideoFormat = mediaFormat
+        mVideoTrackIndex = mediaMuxer.addTrack(mediaFormat)
+        Timber.e(
+          "Added track #$mVideoTrackIndex with ${
+            mVideoFormat?.getString(
+              MediaFormat.KEY_MIME
+            )
+          } to muxer"
+        )
+      }
+      AUDIO -> {
+        mAudioFormat = mediaFormat
+        mAudioTrackIndex = mediaMuxer.addTrack(mediaFormat)
+        Timber.e(
+          "Added track #$mAudioTrackIndex with ${
+            mAudioFormat?.getString(
+              MediaFormat.KEY_MIME
+            )
+          } to muxer"
+        )
+      }
+    }
   }
 
   private fun getTrackIndexForSampleType(sampleType: SampleType): Int? {
