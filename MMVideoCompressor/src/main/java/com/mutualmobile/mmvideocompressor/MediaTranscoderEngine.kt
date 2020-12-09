@@ -18,21 +18,24 @@ import com.mutualmobile.mmvideocompressor.utils.ISO6709LocationParser
 import com.mutualmobile.mmvideocompressor.utils.MediaExtractorUtils
 import com.mutualmobile.mmvideocompressor.utils.MediaExtractorUtils.TrackResult
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.ConflatedBroadcastChannel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileDescriptor
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.min
 
-class MediaTranscoderEngine(
-  private val mediaFileDescriptor: FileDescriptor
-) {
+class MediaTranscoderEngine {
 
-  private val PROGRESS_UNKNOWN = -1.0
-  private val PROGRESS_INTERVAL_STEPS: Long = 10
+  companion object {
+    private const val PROGRESS_UNKNOWN = -1.0
+    private const val PROGRESS_INTERVAL_STEPS: Long = 10
+  }
 
-  suspend fun extractInfo(coroutineContext: CoroutineContext): Pair<MediaFormat?, MediaFormat?> {
+  suspend fun extractInfo(
+    mediaFileDescriptor: FileDescriptor,
+    coroutineContext: CoroutineContext
+  ): Pair<MediaFormat?, MediaFormat?> {
     return withContext(coroutineContext) {
       val mediaExtractor = MediaExtractor()
       mediaExtractor.setDataSource(mediaFileDescriptor)
@@ -47,24 +50,25 @@ class MediaTranscoderEngine(
   suspend fun transcodeVideo(
     outFormatStrategy: MediaFormatStrategy,
     coroutineContext: CoroutineContext,
-    progressChannel: ConflatedBroadcastChannel<Double>,
-    outPath: String
+    progressChannel: MutableStateFlow<Double>?,
+    outPath: String,
+    mediaFileDescriptor: FileDescriptor,
   ): Boolean {
     return withContext(coroutineContext) {
-      val mediaExtractor = MediaExtractor()
-      mediaExtractor.setDataSource(mediaFileDescriptor)
-
-      val mediaMuxer = MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-      val duration = extractVideoDuration(mediaFileDescriptor, mediaMuxer)
-
-      val transcoders = setupTrackTranscoders(outFormatStrategy, mediaExtractor, mediaMuxer)
-
-      runPipelines(
-        duration, transcoders.first, transcoders.second, coroutineContext,
-        progressChannel
-      )
-
       try {
+        val mediaExtractor = MediaExtractor()
+        mediaExtractor.setDataSource(mediaFileDescriptor)
+
+        val mediaMuxer = MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val duration = extractVideoDuration(mediaFileDescriptor, mediaMuxer)
+
+        val transcoders = setupTrackTranscoders(outFormatStrategy, mediaExtractor, mediaMuxer)
+
+        runPipelines(
+          duration, transcoders.first, transcoders.second, coroutineContext,
+          progressChannel
+        )
+
         mediaMuxer.stop()
 
         transcoders.first?.release()
@@ -84,13 +88,13 @@ class MediaTranscoderEngine(
     videoTrackTranscoder: TrackTranscoder?,
     audioTrackTranscoder: TrackTranscoder?,
     coroutineContext: CoroutineContext,
-    progressChannel: ConflatedBroadcastChannel<Double>
+    progressChannel: MutableStateFlow<Double>?
   ) {
     return withContext(coroutineContext) {
       var loopCount = 0
       if (duration <= 0) {
         Timber.d("Trans progress $PROGRESS_UNKNOWN")
-        progressChannel.send(PROGRESS_UNKNOWN)
+        progressChannel?.emit(PROGRESS_UNKNOWN)
       }
 
       val mBufferInfoVideo = MediaCodec.BufferInfo()
@@ -118,7 +122,7 @@ class MediaTranscoderEngine(
     loopCount: Int,
     videoTrackTranscoder: TrackTranscoder?,
     audioTrackTranscoder: TrackTranscoder?,
-    progressChannel: ConflatedBroadcastChannel<Double>
+    progressChannel: MutableStateFlow<Double>?
   ) {
     if (isStillProcessing(duration, loopCount)) {
       val videoProgress =
@@ -129,7 +133,7 @@ class MediaTranscoderEngine(
       Timber.d("video progress $videoProgress")
       Timber.d("audio progress $audioProgress")
       Timber.d("Trans progress $progress")
-      progressChannel.send(progress)
+      progressChannel?.emit(progress)
     }
   }
 

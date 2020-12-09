@@ -3,20 +3,20 @@ package com.mutualmobile.mmvideocompressor
 import android.media.MediaFormat
 import com.mutualmobile.mmvideocompressor.mediaStrategy.MediaFormatStrategy
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.ConflatedBroadcastChannel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 
-object KTMediaTranscoder {
+class KTMediaTranscoder {
 
   var currentTranscodingPath: String? = null
   var currentTranscodingOutPath: String? = null
-  val progressChannel = ConflatedBroadcastChannel<Double>()
 
   suspend fun transcodeVideo(
     inPath: String,
     outPath: String,
-    outFormatStrategy: MediaFormatStrategy
+    outFormatStrategy: MediaFormatStrategy,
+    progressChannel: MutableStateFlow<Double>?
   ): Boolean {
     return withContext(Dispatchers.IO) {
       currentTranscodingPath = inPath
@@ -28,7 +28,9 @@ object KTMediaTranscoder {
       )
       engine.transcodeVideo(
         outFormatStrategy = outFormatStrategy,
-        coroutineContext = coroutineContext, progressChannel = progressChannel, outPath = outPath
+        coroutineContext = coroutineContext,
+        progressChannel = progressChannel,
+        outPath = outPath
       )
       fileInputStream.close()
       true
