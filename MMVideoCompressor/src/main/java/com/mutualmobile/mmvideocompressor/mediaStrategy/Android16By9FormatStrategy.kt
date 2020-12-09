@@ -4,17 +4,19 @@ import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaFormat
 import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_AUDIO_AAC
-import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_VIDEO_AVC
 import timber.log.Timber
 
-class Android600pFormatStrategy @JvmOverloads constructor(
-  private val mVideoBitrate: Int = DEFAULT_VIDEO_BITRATE,
+internal class Android16By9FormatStrategy @JvmOverloads constructor(
+  private val mScale: Int,
+  private val mVideoBitrate: Int,
   private val mAudioBitrate: Int = AUDIO_BITRATE_AS_IS,
   private val mAudioChannels: Int = AUDIO_CHANNELS_AS_IS
 ) : MediaFormatStrategy {
   override fun createVideoOutputFormat(inputFormat: MediaFormat): MediaFormat? {
     val width = inputFormat.getInteger(MediaFormat.KEY_WIDTH)
     val height = inputFormat.getInteger(MediaFormat.KEY_HEIGHT)
+    val targetLonger = mScale * 16 * 16
+    val targetShorter = mScale * 16 * 9
     val longer: Int
     val shorter: Int
     val outWidth: Int
@@ -22,36 +24,34 @@ class Android600pFormatStrategy @JvmOverloads constructor(
     if (width >= height) {
       longer = width
       shorter = height
-      outWidth = LONGER_LENGTH
-      outHeight = SHORTER_LENGTH
+      outWidth = targetLonger
+      outHeight = targetShorter
     } else {
       shorter = width
       longer = height
-      outWidth = SHORTER_LENGTH
-      outHeight = LONGER_LENGTH
+      outWidth = targetShorter
+      outHeight = targetLonger
     }
     if (longer * 9 != shorter * 16) {
-      Timber.e(
-        "WERT ::This video is not 16:9, and is not able to transcode. ($width x $height)"
+      throw Exception(
+        "This video is not 16:9, and is not able to transcode. (" + width + "x" + height + ")"
       )
-      //            throw new OutputFormatUnavailableException("This video is not 16:9, and is not able to transcode. (" + width + "x" + height + ")");
     }
-    if (shorter <= SHORTER_LENGTH) {
-      Timber.e("This video is less or equal to 720p, pass-through.  ($width x $height)")
-      // return null;
+    if (shorter <= targetShorter) {
+      Timber.e("This video is less or equal to, pass-through. (  $width  x $height  )")
+      return null
     }
-    val format = MediaFormat.createVideoFormat(MIMETYPE_VIDEO_AVC, outWidth, outHeight)
+    val format = MediaFormat.createVideoFormat("video/avc", outWidth, outHeight)
+    // From Nexus 4 Camera in 720p
     format.setInteger(MediaFormat.KEY_BIT_RATE, mVideoBitrate)
-    format.setInteger(MediaFormat.KEY_FRAME_RATE, 24)
+    format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)
     format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3)
     format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatSurface)
     return format
   }
 
   override fun createAudioOutputFormat(inputFormat: MediaFormat): MediaFormat? {
-    if (mAudioBitrate == AUDIO_BITRATE_AS_IS || mAudioChannels == AUDIO_CHANNELS_AS_IS) {
-      return null
-    }
+    if (mAudioBitrate == AUDIO_BITRATE_AS_IS || mAudioChannels == AUDIO_CHANNELS_AS_IS) return null
 
     // Use original sample rate, as resampling is not supported yet.
     val format = MediaFormat.createAudioFormat(
@@ -66,8 +66,7 @@ class Android600pFormatStrategy @JvmOverloads constructor(
   companion object {
     const val AUDIO_BITRATE_AS_IS = -1
     const val AUDIO_CHANNELS_AS_IS = -1
-    private const val LONGER_LENGTH = 640
-    private const val SHORTER_LENGTH = 480
-    private const val DEFAULT_VIDEO_BITRATE = 1000 * 1024 // From Nexus 4 Camera in 720p
+    const val SCALE_720P = 5
+    private const val TAG = "Android16By9FormatStrategy"
   }
 }
