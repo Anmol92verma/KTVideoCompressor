@@ -23,14 +23,13 @@ class KTMediaTranscoder {
       currentTranscodingOutPath = outPath
       val fileInputStream = FileInputStream(inPath)
       val inFileDescriptor = fileInputStream.fd
-      val engine = MediaTranscoderEngine(
-        mediaFileDescriptor = inFileDescriptor
-      )
+      val engine = MediaTranscoderEngine()
       engine.transcodeVideo(
         outFormatStrategy = outFormatStrategy,
         coroutineContext = coroutineContext,
         progressChannel = progressChannel,
-        outPath = outPath
+        outPath = outPath,
+        mediaFileDescriptor = inFileDescriptor
       )
       fileInputStream.close()
       true
@@ -41,8 +40,8 @@ class KTMediaTranscoder {
     return withContext(Dispatchers.IO) {
       val fileInputStream = FileInputStream(videoPath)
       val inFileDescriptor = fileInputStream.fd
-      val engine = MediaTranscoderEngine(mediaFileDescriptor = inFileDescriptor)
-      val info = engine.extractInfo(coroutineContext)
+      val engine = MediaTranscoderEngine()
+      val info = engine.extractInfo(mediaFileDescriptor = inFileDescriptor, coroutineContext)
       fileInputStream.close()
       info
     }
