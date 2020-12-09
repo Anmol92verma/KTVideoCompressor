@@ -6,7 +6,7 @@ import android.media.MediaFormat
 import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_AUDIO_AAC
 import timber.log.Timber
 
-internal class Android16By9FormatStrategy @JvmOverloads constructor(
+class Android16By9FormatStrategy(
   private val mScale: Int,
   private val mVideoBitrate: Int,
   private val mAudioBitrate: Int = AUDIO_BITRATE_AS_IS,

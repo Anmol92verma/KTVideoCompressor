@@ -3,11 +3,10 @@ package com.mutualmobile.mmvideocompressor.mediaStrategy
 import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaFormat
-import android.util.Log
 import com.mutualmobile.mmvideocompressor.utils.MIMETYPE_AUDIO_AAC
 import timber.log.Timber
 
-internal class Android480pFormatStrategy @JvmOverloads constructor(
+class Android480pFormatStrategy(
   private val mVideoBitrate: Int = DEFAULT_VIDEO_BITRATE,
   private val mAudioBitrate: Int = AUDIO_BITRATE_AS_IS,
   private val mAudioChannels: Int = AUDIO_CHANNELS_AS_IS
